@@ -1,0 +1,138 @@
+TABLAS:
+
+CREATE DATABASE CompuTienda;
+
+
+USE CompuTienda;
+
+Tabla Productos
+CREATE TABLE Productos (
+    codigo_producto VARCHAR(20) PRIMARY KEY,
+    nombre VARCHAR(100),
+    descripcion TEXT,
+    cantidad_inventario INT,
+    precio_venta DECIMAL(10, 2)
+);
+
+Tabla Clientes
+CREATE TABLE Clientes (
+    id_cliente INT AUTO_INCREMENT PRIMARY KEY,
+    nombre VARCHAR(100),
+    direccion TEXT,
+    correo_electronico VARCHAR(100),
+    telefono VARCHAR(15)
+);
+
+Tabla Compras
+CREATE TABLE Compras (
+    id_compra INT AUTO_INCREMENT PRIMARY KEY,
+    fecha DATE,
+    codigo_producto VARCHAR(20),
+    cantidad INT,
+    precio_unitario DECIMAL(10, 2),
+    FOREIGN KEY (codigo_producto) REFERENCES Productos(codigo_producto)
+);
+
+Tabla Facturas
+CREATE TABLE Facturas (
+    id_factura INT AUTO_INCREMENT PRIMARY KEY,
+    fecha DATE,
+    id_cliente INT,
+    codigo_producto VARCHAR(20),
+    cantidad INT,
+    precio_unitario DECIMAL(10, 2),
+    total DECIMAL(10, 2),
+    FOREIGN KEY (id_cliente) REFERENCES Clientes(id_cliente),
+    FOREIGN KEY (codigo_producto) REFERENCES Productos(codigo_producto)
+);
+
+MANEJO DE TRANSACCIONES:
+
+START TRANSACTION;
+
+INSERT INTO Compras (fecha, codigo_producto, cantidad, precio_unitario)
+VALUES ('2024-08-13', 'P001', 2, 500.00);
+
+UPDATE Productos
+SET cantidad_inventario = cantidad_inventario - 2
+WHERE codigo_producto = 'P001';
+
+COMMIT;
+
+START TRANSACTION;
+
+INSERT INTO Compras (fecha, codigo_producto, cantidad, precio_unitario)
+VALUES ('2024-08-13', 'P001', 2, 500.00);
+
+ROLLBACK;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+
+public class DatabaseConnection {
+    private static final String URL = "jdbc:mysql://localhost:3306/CompuTienda";
+    private static final String USER = "root";
+    private static final String PASSWORD = "123456";
+
+    public static Connection getConnection() throws SQLException {
+        return DriverManager.getConnection(URL, USER, PASSWORD);
+    }
+}
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+
+public class TransactionExample {
+    public static void main(String[] args) {
+        Connection conn = null;
+        PreparedStatement psCompra = null;
+        PreparedStatement psUpdateProducto = null;
+
+        try {
+            conn = DatabaseConnection.getConnection();
+            conn.setAutoCommit(false); 
+
+            String sqlCompra = "INSERT INTO Compras (fecha, codigo_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?)";
+            String sqlUpdateProducto = "UPDATE Productos SET cantidad_inventario = cantidad_inventario - ? WHERE codigo_producto = ?";
+
+            psCompra = conn.prepareStatement(sqlCompra);
+            psUpdateProducto = conn.prepareStatement(sqlUpdateProducto);
+
+            psCompra.setDate(1, java.sql.Date.valueOf("2024-08-13"));
+            psCompra.setString(2, "P001");
+            psCompra.setInt(3, 2);
+            psCompra.setBigDecimal(4, new java.math.BigDecimal("500.00"));
+            psCompra.executeUpdate();
+
+            psUpdateProducto.setInt(1, 2);
+            psUpdateProducto.setString(2, "P001");
+            psUpdateProducto.executeUpdate();
+
+            conn.commit();
+            System.out.println("Transacción completada exitosamente.");
+
+        } catch (SQLException e) {
+            if (conn != null) {
+                try {
+                    System.out.println("Error encontrado. Revirtiendo cambios...");
+                    conn.rollback(); 
+                } catch (SQLException rollbackEx) {
+                    rollbackEx.printStackTrace();
+                }
+            }
+            e.printStackTrace();
+        } finally {
+            try {
+                if (psCompra != null) psCompra.close();
+                if (psUpdateProducto != null) psUpdateProducto.close();
+                if (conn != null) conn.close();
+            } catch (SQLException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+}
+
+
